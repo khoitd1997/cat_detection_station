@@ -14,7 +14,7 @@ Software for a station that detects a cat presence and then notify other people
 
 [I2C kernel driver](https://bootlin.com/pub/conferences/2018/elc/opdenacker-kernel-programming-device-model-i2c/kernel-programming-device-model-i2c.pdf)
 
-[I2C kernel driver example](https://www.kernel.org/doc/Documentation/i2c/dev-interface)
+[I2C kernel driver example](https://www.kernel.org/doc/Documentation/i2c/writing-clients)
 
 ## Hardware
 
@@ -34,3 +34,4 @@ This project uses an rpi3 as the main board running a custom linux distro create
 - Python 3(may be removed later if opencv c++ is used instead)
 - Custom driver for the OV7670, and the temperature sensor, so it needs i2c support
 - Either Bluetooth or wifi support for sending data
+- OTA update if possible(using stuffs like swupdate)
