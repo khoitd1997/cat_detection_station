@@ -30,11 +30,7 @@
 #include <linux/mutex.h>
 #include <linux/types.h>
 
-#define DRIVER_NAME "bmp280_kd"
-
-#define BMP280_ADDR 0x77
-#define BMP280_ID_REG 0xD0
-#define BMP280_ID 0x58
+#include "bmp280_kd_info.h"
 
 struct bmp280_kd_data {
   struct mutex access_lock;
