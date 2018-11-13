@@ -10,4 +10,5 @@ source remove_driver.sh
 
 # install new driver
 make
+print_message "Installing New Driver"
 sudo insmod bmp280_kd.ko
