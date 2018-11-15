@@ -2,6 +2,10 @@
 
 Software for a station that detects a cat presence and then notify other people
 
+## Backstory
+
+The place I live at has a cat stray cat named Mimi, he(or she) comes about 3 times every day on varying hour depending on the weather condition and his laziness, I build this device to notify my family when he is there so we don't have to constantly go outside to check if he is there. There are probably simpler solution but I just want to use Buildroot and write some kernel drivers so this seems as good as any project to use that.
+
 ## References
 
 [SCCB vs I2C for the OV7670](http://e2e.ti.com/support/processors/f/791/t/6092?SCCB-vs-I2C)
