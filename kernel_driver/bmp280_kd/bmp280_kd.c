@@ -22,12 +22,13 @@
  * General Public License for more details.
  */
 
-#include <linux/err.h>
+#include <linux/device.h>
 #include <linux/errno.h>
+#include <linux/fs.h>
 #include <linux/i2c.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/types.h>
 
 #include "bmp280_kd_info.h"
@@ -35,6 +36,37 @@
 struct bmp280_kd_data {
   struct mutex access_lock;
 };
+
+static int            majorNumber;
+static struct class * bmpClass  = NULL;
+static struct device *bmpDevice = NULL;
+
+static int     bmp280_kd_open(struct inode *, struct file *);
+static int     bmp280_kd_release(struct inode *, struct file *);
+static ssize_t bmp280_kd_read(struct file *, char *, size_t, loff_t *);
+static ssize_t bmp280_kd_write(struct file *, const char *, size_t, loff_t *);
+
+static struct file_operations fops = {
+    .open    = bmp280_kd_open,
+    .read    = bmp280_kd_read,
+    .write   = bmp280_kd_write,
+    .release = bmp280_kd_release,
+};
+
+static int bmp280_kd_open(struct inode *inodep, struct file *filp) {
+  printk(KERN_DEBUG "Opening char file\n");
+  return 0;
+}
+static int bmp280_kd_release(struct inode *inodep, struct file *filp) {
+  printk(KERN_DEBUG "Closing char file\n");
+  return 0;
+}
+static ssize_t bmp280_kd_read(struct file *filp, char *buffer, size_t len, loff_t *offset) {
+  return 0;
+}
+static ssize_t bmp280_kd_write(struct file *filp, const char *buffer, size_t len, loff_t *offset) {
+  return 0;
+}
 
 static int bmp280_kd_suspend(struct device *dev) { return 0; }
 
@@ -91,6 +123,30 @@ static const struct i2c_board_info bmp280_kd_info __initdata = {
 };
 
 static int __init bmp280_kd_init(void) {
+  majorNumber = register_chrdev(0, DRIVER_NAME, &fops);
+  if (majorNumber < 0) {
+    printk(KERN_ALERT "bmp280_kd failed to register a major number\n");
+    return majorNumber;
+  }
+  printk(KERN_INFO "bmp280_kd: registered correctly with major number %d\n", majorNumber);
+
+  bmpClass = class_create(THIS_MODULE, CLASS_NAME);
+  if (IS_ERR(bmpClass)) {
+    unregister_chrdev(majorNumber, DRIVER_NAME);
+    printk(KERN_ALERT "bmp280_kd failed to register device class\n");
+    return PTR_ERR(bmpClass);
+  }
+  printk(KERN_INFO "bmp280_kd: device class registered correctly\n");
+
+  bmpDevice = device_create(bmpClass, NULL, MKDEV(majorNumber, 0), NULL, "bmp280_kd_1");
+  if (IS_ERR(bmpDevice)) {
+    class_destroy(bmpClass);
+    unregister_chrdev(majorNumber, DRIVER_NAME);
+    printk(KERN_ALERT "Failed to create the device\n");
+    return PTR_ERR(bmpDevice);
+  }
+  printk(KERN_INFO "bmp280_kd: char device class created correctly\n");
+
   struct i2c_adapter *adapter = NULL;
 
   printk(KERN_DEBUG "Initializing bmp280 Driver");
@@ -104,7 +160,13 @@ static int __init bmp280_kd_init(void) {
 }
 module_init(bmp280_kd_init);
 
-static void __exit bmp280_kd_cleanup(void) { i2c_del_driver(&bmp280_kd_driver); };
+static void __exit bmp280_kd_cleanup(void) {
+  device_destroy(bmpClass, MKDEV(majorNumber, 0));
+  class_unregister(bmpClass);
+  class_destroy(bmpClass);
+  unregister_chrdev(majorNumber, DRIVER_NAME);
+  i2c_del_driver(&bmp280_kd_driver);
+};
 module_exit(bmp280_kd_cleanup);
 
 MODULE_AUTHOR("Khoi Trinh");
