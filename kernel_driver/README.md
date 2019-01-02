@@ -28,6 +28,16 @@ https://opensourceforu.com/2017/01/regmap-reducing-redundancy-linux-code/ (regma
 
 https://www.amazon.com/Linux-Device-Drivers-Development-customized-ebook/dp/B073V4LKWN (book has good chapter on regmap)
 
+## HTU21D Driver
+
+I copied most of sparkfun macros for register definition [here](https://github.com/sparkfun/SparkFun_HTU21D_Breakout_Arduino_Library/blob/master/src/SparkFunHTU21D.h), the rest is just implementation of the datasheet
+
+I don't implement all of the features, just enough to read/write in hold mode as well as adjust the resolution and reset the device, the sensors took more time to measure than I expected so there is a delay function in there, future implementation may utilize this delay to do other stuffs(like ask for a measurements, then do something else and get back to grab it)
+
+Special thanks to Sparkfun repo for the macros and the reference, the i2c protocol specified in the datasheet wasn't accurate of what the sensors wanted and Sparkfun reference code was really helpful
+
+The HTU21D measures both temperature and humidity but due to the long delay time, I would probably use only the humidity and uses the temperature of the bmp280
+
 ## BMP280 driver
 
 I ported most of the code from [Bosch Github](https://github.com/BoschSensortec/BMP280_driver#examples) and integrated it with the iio subsystem of the kernel, **THERE WAS A BUG** their uncomp number should have been s32(like the datasheet said) but it ended up being u32, which messed up a lot of things.
