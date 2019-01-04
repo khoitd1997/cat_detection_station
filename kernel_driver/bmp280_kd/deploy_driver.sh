@@ -1,6 +1,7 @@
 #!/bin/bash
 
-pi_address="pi@192.168.1.73"
+# pi_address="pi@192.168.1.73"
+pi_address="pi@192.168.1.75"
 
 scp -r  ../../kernel_driver ${pi_address}:~
 # ; bash -l

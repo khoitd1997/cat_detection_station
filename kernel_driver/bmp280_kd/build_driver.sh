@@ -9,6 +9,7 @@ chmod u+x remove_driver.sh
 source remove_driver.sh
 
 # install new driver
+make clean
 make
 sudo ln -s ~/kernel_driver/bmp280_kd/bmp280_kd.ko /lib/modules/`uname -r`
 sudo depmod -a
