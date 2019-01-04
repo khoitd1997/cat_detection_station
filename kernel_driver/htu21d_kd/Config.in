@@ -1,0 +1,5 @@
+config BR2_PACKAGE_HTU21D_KD
+        bool "htu21d_kd"
+        depends on BR2_LINUX_KERNEL
+        help 
+            htu21d kernel module written by Khoi Trinh.

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_BMP280_KD
+        bool "bmp280_kd"
+        depends on BR2_LINUX_KERNEL
+        help 
+            BMP280 kernel module written by Khoi Trinh.

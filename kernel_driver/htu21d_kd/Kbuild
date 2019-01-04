@@ -1,0 +1,1 @@
+obj-m += htu21d_kd.o

@@ -1,6 +1,6 @@
-obj-m+=htu21d_kd.o
+ccflags-y := -std=gnu99 -g -Wall -Wno-declaration-after-statement
 
 all:
-	make -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) modules
+	$(MAKE) -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) modules
 clean:
-	make -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) clean
+	$(MAKE) -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) clean

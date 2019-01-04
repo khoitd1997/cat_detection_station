@@ -1,0 +1,2 @@
+source "$BR2_EXTERNAL_KD_BR2_PATH/bmp280_kd/Config.in"
+source "$BR2_EXTERNAL_KD_BR2_PATH/htu21d_kd/Config.in"
