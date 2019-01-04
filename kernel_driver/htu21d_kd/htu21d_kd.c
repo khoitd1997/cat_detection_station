@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/sysfs.h>
@@ -29,6 +30,7 @@
 #include <linux/iio/sysfs.h>
 
 #define DRIVER_NAME "htu21d_kd"
+#define MANUFACTURER "bosch"
 
 #define HTU21D_ADDRESS 0x40  // Unshifted 7-bit I2C address for the sensor
 
@@ -133,7 +135,7 @@ static int htu21d_read_data_no_hold(struct i2c_client *    client,
   if (ret < 0) { printk(KERN_DEBUG "HTU21d: Error while writing data no hold, errors: %d", ret); }
   delayms = htu21d_get_meas_delayms(res, type);
   msleep(delayms);
-  printk(KERN_DEBUG "Selected delays: %d", delayms);
+  printk(KERN_DEBUG "Selected delays: %lu", delayms);
   ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
   if (ret < 0) {
     msleep(2);  // give it some more time
@@ -306,27 +308,40 @@ static int htu21d_kd_remove(struct i2c_client *client) {
   return 0;
 }
 
+static const struct of_device_id htu21d_kd_of_match[] = {
+    {
+        .compatible = MANUFACTURER "," DRIVER_NAME,
+    },
+    {},
+};
+MODULE_DEVICE_TABLE(of, htu21d_kd_of_match);
+
 static const struct i2c_device_id htu21d_kd_id[] = {{DRIVER_NAME, 0}, {}};
 MODULE_DEVICE_TABLE(i2c, htu21d_kd_id);
 
 static struct i2c_driver htu21d_kd_driver = {.probe    = htu21d_kd_probe,
                                              .remove   = htu21d_kd_remove,
                                              .id_table = htu21d_kd_id,
-                                             .driver = {.owner = THIS_MODULE, .name = DRIVER_NAME}};
+                                             .driver   = {
+                                                 .owner          = THIS_MODULE,
+                                                 .name           = DRIVER_NAME,
+                                                 .of_match_table = of_match_ptr(htu21d_kd_of_match),
+                                             }};
 
 static const struct i2c_board_info htu21d_kd_info __initdata = {
     I2C_BOARD_INFO(DRIVER_NAME, HTU21D_ADDRESS),
 };
 
 static int __init htu21d_kd_init(void) {
-  struct i2c_adapter *adapter = NULL;
-
+#ifdef DEBUG
   printk(KERN_DEBUG "Initializing htu21d Driver");
 
+  struct i2c_adapter *adapter = NULL;
   // create new devices, will log an error if already exists one but otw will work
   adapter = i2c_get_adapter(1);
   if (NULL == adapter) { printk(KERN_DEBUG "Can't find adapter"); }
   i2c_new_device(adapter, &htu21d_kd_info);
+#endif
 
   return i2c_add_driver(&htu21d_kd_driver);
 }
@@ -335,6 +350,7 @@ module_init(htu21d_kd_init);
 static void __exit htu21d_kd_cleanup(void) { i2c_del_driver(&htu21d_kd_driver); };
 module_exit(htu21d_kd_cleanup);
 
-MODULE_AUTHOR("Khoi Trinh");
+MODULE_AUTHOR("Khoi Trinh <khoidinhtrinh@gmail.com>");
 MODULE_DESCRIPTION("htu21d kernel driver for the cat detector");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0");

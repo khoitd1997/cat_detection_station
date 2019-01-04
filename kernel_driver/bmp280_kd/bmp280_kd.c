@@ -48,6 +48,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/sysfs.h>
@@ -58,8 +59,8 @@
 #include <linux/iio/sysfs.h>
 
 #define DRIVER_NAME "bmp280_kd"
+#define MANUFACTURER "bosch"
 
-#define BMP280_ADDR 0x77
 #define BMP280_ID_REG 0xD0
 #define BMP280_ID 0x58
 
@@ -442,11 +443,9 @@ static s8 get_calib_param(struct bmp280_kd_data *dev) {
 }
 
 static s8 bmp280_soft_reset(const struct bmp280_kd_data *dev) {
-  s8 rslt;
+  s8 rslt         = null_ptr_check(dev);
   u8 reg_addr     = BMP280_SOFT_RESET_ADDR;
   u8 soft_rst_cmd = BMP280_SOFT_RESET_CMD;
-
-  rslt = null_ptr_check(dev);
 
   if (rslt == BMP280_OK) {
     rslt = bmp280_set_regs(&reg_addr, &soft_rst_cmd, 1, dev);
@@ -459,11 +458,9 @@ static s8 bmp280_soft_reset(const struct bmp280_kd_data *dev) {
 }
 
 static s8 conf_sensor(u8 mode, const struct bmp280_config *conf, struct bmp280_kd_data *dev) {
-  s8 rslt;
+  s8 rslt        = null_ptr_check(dev);
   u8 temp[2]     = {0, 0};
   u8 reg_addr[2] = {BMP280_CTRL_MEAS_ADDR, BMP280_CONFIG_ADDR};
-
-  rslt = null_ptr_check(dev);
 
   if ((rslt == BMP280_OK) && (conf != NULL)) {
     rslt = bmp280_get_regs(BMP280_CTRL_MEAS_ADDR, temp, 2, dev);
@@ -505,10 +502,8 @@ static s8 conf_sensor(u8 mode, const struct bmp280_config *conf, struct bmp280_k
 }
 
 static s8 bmp280_get_config(struct bmp280_config *conf, struct bmp280_kd_data *dev) {
-  s8 rslt;
+  s8 rslt    = null_ptr_check(dev);
   u8 temp[2] = {0, 0};
-
-  rslt = null_ptr_check(dev);
 
   if ((rslt == BMP280_OK) && (conf != NULL)) {
     rslt = bmp280_get_regs(BMP280_CTRL_MEAS_ADDR, temp, 2, dev);
@@ -761,7 +756,7 @@ static int bmp280_kd_read_raw(
   struct bmp280_kd_data *data = iio_priv(indio_dev);
   s32                    ret  = 0;
 
-  // mutex_lock(&data->lock);
+  mutex_lock(&data->lock);
   switch (chan->type) {
     case IIO_TEMP:
       switch (mask) {
@@ -801,11 +796,11 @@ static int bmp280_kd_read_raw(
   }
 
 out:
-  // mutex_unlock(&data->lock);
+  mutex_unlock(&data->lock);
   return ret;
 }
 
-// // static IIO_CONST_ATTR(in_temperature_scale, "10");
+// // static IIO_CONST_ATTR(in_temp_scale, "10");
 // // static IIO_CONST_ATTR(in_pressure_scale, );
 
 static struct attribute *bmp280_kd_attributes[] = {
@@ -831,8 +826,6 @@ static int bmp280_kd_probe(struct i2c_client *client, const struct i2c_device_id
   struct bmp280_kd_data *chip;
   struct iio_dev *       indio_dev;
   s32                    ret;
-  s32                    bmp280_id;
-  s8                     mode;
 
   printk(KERN_DEBUG "Probe started");
 
@@ -853,7 +846,7 @@ static int bmp280_kd_probe(struct i2c_client *client, const struct i2c_device_id
   chip->delay_ms = msleep;
 
   // configure bmp settings
-  ret                 = bmp280_init(chip);  // get device ready and write default settings in
+  ret                 = bmp280_init(chip);
   chip->conf.os_temp  = BMP280_OS_2X;
   chip->conf.os_pres  = BMP280_OS_16X;
   chip->conf.odr      = BMP280_ODR_62_5_MS;
@@ -888,31 +881,49 @@ static int bmp280_kd_remove(struct i2c_client *client) {
   return 0;
 }
 
+static const struct of_device_id bmp280_kd_of_match[] = {
+    {
+        .compatible = MANUFACTURER "," DRIVER_NAME,
+    },
+    {},
+};
+MODULE_DEVICE_TABLE(of, bmp280_kd_of_match);
+
 static const struct i2c_device_id bmp280_kd_id[] = {{DRIVER_NAME, 0}, {}};
 MODULE_DEVICE_TABLE(i2c, bmp280_kd_id);
 
 static const struct dev_pm_ops bmp280_kd_pm_ops = {.suspend = bmp280_kd_suspend,
                                                    .resume  = bmp280_kd_resume};
 
-static struct i2c_driver bmp280_kd_driver = {
-    .probe    = bmp280_kd_probe,
-    .remove   = bmp280_kd_remove,
-    .id_table = bmp280_kd_id,
-    .driver   = {.pm = &bmp280_kd_pm_ops, .owner = THIS_MODULE, .name = DRIVER_NAME}};
+static struct i2c_driver bmp280_kd_driver = {.probe    = bmp280_kd_probe,
+                                             .remove   = bmp280_kd_remove,
+                                             .id_table = bmp280_kd_id,
+                                             .driver   = {
+                                                 .pm             = &bmp280_kd_pm_ops,
+                                                 .owner          = THIS_MODULE,
+                                                 .name           = DRIVER_NAME,
+                                                 .of_match_table = of_match_ptr(bmp280_kd_of_match),
+                                             }};
 
 static const struct i2c_board_info bmp280_kd_info __initdata = {
-    I2C_BOARD_INFO(DRIVER_NAME, BMP280_ADDR),
+    I2C_BOARD_INFO(DRIVER_NAME, BMP280_I2C_ADDR_SEC),
 };
 
 static int __init bmp280_kd_init(void) {
-  struct i2c_adapter *adapter = NULL;
-
   printk(KERN_DEBUG "Initializing bmp280 Driver");
 
+#ifdef DEBUG
+  printk(KERN_DEBUG "Starting bmp280 init debug of regular");
+
+  struct i2c_adapter *adapter = NULL;
   // create new devices, will log an error if already exists one but otw will work
   adapter = i2c_get_adapter(1);
-  if (NULL == adapter) { printk(KERN_DEBUG "Can't find adapter"); }
-  i2c_new_device(adapter, &bmp280_kd_info);
+  if (NULL == adapter) {
+    printk(KERN_DEBUG "Can't find adapter");
+  } else {
+    i2c_new_device(adapter, &bmp280_kd_info);
+  }
+#endif
 
   return i2c_add_driver(&bmp280_kd_driver);
 }
@@ -921,6 +932,7 @@ module_init(bmp280_kd_init);
 static void __exit bmp280_kd_cleanup(void) { i2c_del_driver(&bmp280_kd_driver); };
 module_exit(bmp280_kd_cleanup);
 
-MODULE_AUTHOR("Khoi Trinh");
+MODULE_AUTHOR("Khoi Trinh <khoidinhtrinh@gmail.com>");
 MODULE_DESCRIPTION("BMP280 kernel driver for the cat detector");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0");
