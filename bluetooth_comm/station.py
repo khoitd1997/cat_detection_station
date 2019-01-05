@@ -6,7 +6,7 @@ from PIL import Image
 import time
 import traceback
 
-
+import cat_logger
 from bluetooth_shared import bluetooth_const, bluetooth_utils
 
 
@@ -18,7 +18,7 @@ def start_weather_server(logger: logging.Logger)->None:
         server_sock.listen(1)
     except Exception as error:
         logger.error("Error trying to bind and listen: " + str(error))
-        return None
+        return
 
     logger.info("listening for bluetooth connections")
     bluetooth.advertise_service(server_sock, bluetooth_const.weather_service_name, bluetooth_const.weather_service_uuid)
@@ -49,15 +49,16 @@ def start_weather_server(logger: logging.Logger)->None:
 
 
 def send_cat_update(catIsHere: bool, pictureLocation: str, logger: logging.Logger)->None:
+    logger.info("Starting process to send cat updates")
     try:
         service_matches = bluetooth.find_service(address=bluetooth_const.host_addr,  uuid=bluetooth_const.cat_alert_service_uuid)
     except Exception as error:
         logger.error("Error trying to find cat alert service: " + str(error))
-        return None
+        return
 
     if len(service_matches) == 0:
         logger.debug("Can't find any services that match cat alert service")
-        return None
+        return
 
     match = None
     for con in service_matches:
@@ -74,7 +75,7 @@ def send_cat_update(catIsHere: bool, pictureLocation: str, logger: logging.Logge
             sock.connect((host, port))
         except Exception as error:
             logger.error("Can't connect to cat alert service: " + str(error))
-            return None
+            return
 
         try:
             data = bluetooth_const.cat_info_prototype
@@ -87,21 +88,17 @@ def send_cat_update(catIsHere: bool, pictureLocation: str, logger: logging.Logge
         except Exception as error:
             logger.error("Error trying to send picture to host: " + str(error))
             traceback.print_exc()
+
         finally:
             sock.close()
     else:
         logger.debug("No services matched weather service")
-        return None
+        return
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG, format=bluetooth_const.logger_format, filename='cat_station.log',
-                    filemode='a')
-    logger = logging.getLogger("Weather Server Logger")
-
-    fh = logging.StreamHandler()
-    fh.setLevel(logging.DEBUG)
-    logger.addHandler(fh)
+    cat_logger.setup_logger("cat_station.log")
+    logger = cat_logger.get_logger()
 
     # try:
     #     t = threading.Thread(target=start_weather_server, args=(logger,))

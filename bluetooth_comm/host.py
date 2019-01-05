@@ -9,7 +9,7 @@ import socket
 import io
 import traceback
 
-
+import cat_logger
 from bluetooth_shared import bluetooth_const, bluetooth_utils
 
 
@@ -97,14 +97,8 @@ def start_cat_alert_server(logger: logging.Logger):
     server_sock.close()
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG, format=bluetooth_const.logger_format, filename='cat_host.log',
-                    filemode='a')
-    logger = logging.getLogger("Weather Client Logger")
-
-    # only for debug purpose
-    fh = logging.StreamHandler()
-    fh.setLevel(logging.DEBUG)
-    logger.addHandler(fh)
+    cat_logger.setup_logger("cat_host.log")
+    logger = cat_logger.get_logger()
 
     try:
         t = threading.Thread(target=start_cat_alert_server, args=(logger,))

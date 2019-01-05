@@ -13,8 +13,6 @@ cat_alert_service_uuid = "23a77f17-1a9b-4779-957b-77cab8eefb6e"
 cat_alert_service_name = "Cat Alert Service"
 cat_picture_size = 30000
 
-logger_format = '%(asctime)-15s %(message)s'
-
 # sample message for the weather service
 weather_info_prototype = {
     "temperature": 1.1,  # celsius

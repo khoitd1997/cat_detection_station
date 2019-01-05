@@ -50,14 +50,7 @@ def recv_all(sock, max_size):
     return bytes(b''.join(fragments))
 
 
-def trim_data_len(dataLen: str):
-    for i in range(0, len(dataLen)):
-        if dataLen[i] != '0':
-            return dataLen[i:]
-
-
 def recv_data(sock):
-    # dataLen = trim_data_len(recv_all(sock, bluetooth_const.max_data_len).decode("utf-8"))
     dataLen = int(recv_all(sock, bluetooth_const.max_data_len).decode("utf-8"))
     data = recv_all(sock, dataLen)
     return data
