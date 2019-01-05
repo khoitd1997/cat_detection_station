@@ -7,6 +7,7 @@ import threading
 import errno
 import socket
 import io
+import traceback
 
 
 from bluetooth_shared import bluetooth_const, bluetooth_utils
@@ -74,15 +75,12 @@ def start_cat_alert_server(logger: logging.Logger):
 
             if address[0] == bluetooth_const.cat_station_addr:
                 logger.info("Handling connection from %s", address)
-                data = bluetooth_utils.recv_all(client_sock, bluetooth_const.cat_picture_size)
-                if bluetooth_const.data_separator in data:
-                    dataList = data.split(bluetooth_const.data_separator)
-                    cat_info = json.loads(dataList[0])
-                    print(str(cat_info["catIsHere"]))
-                    img = Image.open(io.BytesIO(dataList[1]))
+                cat_info = json.loads(bluetooth_utils.recv_data(client_sock))
+                if cat_info["catIsHere"]:
+                    img = Image.open(io.BytesIO(bluetooth_utils.recv_data(client_sock)))
                     img.show()
+                    print(str(cat_info["catIsHere"]))
                 else:
-                    cat_info = json.loads(data)
                     print(str(cat_info["catIsHere"]))
 
             else:
@@ -90,6 +88,7 @@ def start_cat_alert_server(logger: logging.Logger):
 
         except Exception as error:
             logger.error("Problem communicating with clients: " + str(error))
+            traceback.print_exc()
             break
         finally:
             client_sock.close()
@@ -113,5 +112,4 @@ if __name__ == "__main__":
     except Exception as error:
         logger.error("Error starting threads: " + str(error))
 
-    data = get_weather_data(logger)
-    # start_cat_alert_server(logger)
+    # data = get_weather_data(logger)

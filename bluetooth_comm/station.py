@@ -4,6 +4,8 @@ import threading
 import logging
 from PIL import Image
 import time
+import traceback
+
 
 from bluetooth_shared import bluetooth_const, bluetooth_utils
 
@@ -78,15 +80,13 @@ def send_cat_update(catIsHere: bool, pictureLocation: str, logger: logging.Logge
             data = bluetooth_const.cat_info_prototype
             data["catIsHere"] = catIsHere
             data["timestamp"] = time.asctime(time.localtime(time.time()))
-            temp = bytearray(json.dumps(data), 'utf8')
+            bluetooth_utils.send_data(sock, bytearray(json.dumps(data), 'utf8'))
             if catIsHere:
-                temp.extend(bytearray(bluetooth_const.data_separator, 'utf8'))
-                temp.extend(bytearray(open(pictureLocation, "rb").read()))
-
-            bluetooth_utils.send_all(sock, temp)
+                bluetooth_utils.send_data(sock, bytearray(open(pictureLocation, "rb").read()))
 
         except Exception as error:
             logger.error("Error trying to send picture to host: " + str(error))
+            traceback.print_exc()
         finally:
             sock.close()
     else:
@@ -103,11 +103,11 @@ if __name__ == "__main__":
     fh.setLevel(logging.DEBUG)
     logger.addHandler(fh)
 
-    try:
-        t = threading.Thread(target=start_weather_server, args=(logger,))
-        t.start()
-    except Exception as error:
-        logger.error("Error starting threads: " + str(error))
+    # try:
+    #     t = threading.Thread(target=start_weather_server, args=(logger,))
+    #     t.start()
+    # except Exception as error:
+    #     logger.error("Error starting threads: " + str(error))
 
-    time.sleep(40)
-    send_cat_update(False, "test_cat_photo.jpg", logger)
+    # time.sleep(40)
+    send_cat_update(True, "test_cat_photo.jpg", logger)

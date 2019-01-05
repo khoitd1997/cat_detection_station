@@ -1,5 +1,6 @@
 # store bluetooth constants for both client and station
 data_separator = b"||"  # used for separating bytes array in socket data
+max_data_len = 10  # how many bytes to express len of package
 
 cat_station_addr = "B8:27:EB:63:F0:19"
 host_addr = "00:1A:7D:DA:71:13"
