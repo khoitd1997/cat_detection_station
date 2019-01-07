@@ -14,13 +14,14 @@ cat_alert_service_name = "Cat Alert Service"
 cat_picture_size = 30000
 
 # sample message for the weather service
-weather_info_prototype = {
+weather_report_prototype = {
     "temperature": 1.1,  # celsius
     "pressure": 1.1,  # Pascal
     "humidity": 50.5,  # Percent
+    "timestamp": "Tue Jan 13 10:17:09 2009",
 }
 
-cat_info_prototype = {
+cat_report_prototype = {
     "catIsHere": True,
     "timestamp": "Tue Jan 13 10:17:09 2009",
 }

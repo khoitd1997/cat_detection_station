@@ -17,7 +17,7 @@ def make_package(data: bytearray)->bytes:
     return bytes(lenDescriptor)
 
 
-def send_data(sock, data):
+def send_data(sock, data: bytearray):
     totalSent = 0
     data = make_package(data)
     if data:

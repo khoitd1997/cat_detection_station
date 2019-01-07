@@ -30,7 +30,7 @@ def start_weather_server(logger: logging.Logger)->None:
 
             if address[0] == bluetooth_const.host_addr:
                 logger.info("Handling connection from %s", address)
-                resp = bluetooth_const.weather_info_prototype
+                resp = bluetooth_const.weather_report_prototype
                 resp["temperature"] = 10.5
                 resp["pressure"] = 9.6
                 resp["humidity"] = 13.2
@@ -78,7 +78,7 @@ def send_cat_update(catIsHere: bool, pictureLocation: str, logger: logging.Logge
             return
 
         try:
-            data = bluetooth_const.cat_info_prototype
+            data = bluetooth_const.cat_report_prototype
             data["catIsHere"] = catIsHere
             data["timestamp"] = time.asctime(time.localtime(time.time()))
             bluetooth_utils.send_data(sock, bytearray(json.dumps(data), 'utf8'))
