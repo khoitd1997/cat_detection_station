@@ -624,10 +624,6 @@ static s8 bmp280_set_power_mode(u8 mode, struct bmp280_kd_data *dev) {
   return rslt;
 }
 
-/*!
- * @brief This API reads the temperature and pressure data registers.
- * It gives the raw temperature and pressure data .
- */
 static s8 bmp280_get_uncomp_data(struct bmp280_uncomp_data *  uncomp_data,
                                  const struct bmp280_kd_data *dev) {
   s8 rslt;
@@ -653,15 +649,14 @@ static s8 bmp280_get_uncomp_data(struct bmp280_uncomp_data *  uncomp_data,
  * @brief This API is used to get the compensated temperature from
  * uncompensated temperature. This API uses 32 bit integers.
  */
-static s32 bmp280_comp_temp_32bit(s32 uncomp_temp, struct bmp280_kd_data *dev) {
+static s32 bmp280_comp_temp_32bit(s32 uncomp_temp, struct bmp280_kd_data *dev, s32 *output_val) {
   s32 var1;
   s32 var2;
-  s32 temperature = 0;
   s8  rslt;
 
   rslt = null_ptr_check(dev);
 
-  if (rslt == BMP280_OK) {
+  if (rslt == BMP280_OK && NULL != output_val) {
     var1 = ((((uncomp_temp >> 3) - ((s32)dev->calib_param.dig_t1 << 1))) *
             ((s32)dev->calib_param.dig_t2)) >>
            11;
@@ -672,19 +667,22 @@ static s32 bmp280_comp_temp_32bit(s32 uncomp_temp, struct bmp280_kd_data *dev) {
            14;
 
     dev->calib_param.t_fine = var1 + var2;
-    temperature             = (dev->calib_param.t_fine * 5 + 128) >> 8;
+    *output_val             = (dev->calib_param.t_fine * 5 + 128) >> 8;
   } else {
     printk(KERN_DEBUG "NULL pointer in comp temp");
+    return BMP280_E_NULL_PTR;
   }
 
-  return temperature;
+  return BMP280_OK;
 }
 
 /*!
  * @brief This API is used to get the compensated pressure from
  * uncompensated pressure. This API uses 32 bit integers.
  */
-static u32 bmp280_comp_pres_32bit(s32 uncomp_pres, const struct bmp280_kd_data *dev) {
+static s32 bmp280_comp_pres_32bit(s32                          uncomp_pres,
+                                  const struct bmp280_kd_data *dev,
+                                  u32 *                        output_val) {
   s32 var1;
   s32 var2;
   u32 pressure = 0;
@@ -692,7 +690,7 @@ static u32 bmp280_comp_pres_32bit(s32 uncomp_pres, const struct bmp280_kd_data *
 
   rslt = null_ptr_check(dev);
 
-  if (rslt == BMP280_OK) {
+  if (rslt == BMP280_OK && NULL != output_val) {
     var1 = (((s32)dev->calib_param.t_fine) >> 1) - (s32)64000;
     var2 = (((var1 >> 2) * (var1 >> 2)) >> 11) * ((s32)dev->calib_param.dig_p6);
     var2 = var2 + ((var1 * ((s32)dev->calib_param.dig_p5)) << 1);
@@ -720,9 +718,10 @@ static u32 bmp280_comp_pres_32bit(s32 uncomp_pres, const struct bmp280_kd_data *
     } else {
       pressure = 0;
     }
+    *output_val = pressure;
   }
 
-  return pressure;
+  return rslt;
 }
 
 enum bmp280_kd_chan {
@@ -736,23 +735,18 @@ static const struct iio_chan_spec bmp280_kd_channels[] = {
             .type                     = IIO_TEMP,
             .info_mask_separate       = BIT(IIO_CHAN_INFO_PROCESSED),
             .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
-            // .info_mask_shared_by_all  = BIT(IIO_CHAN_INFO_SAMP_FREQ),
         },
     [PRESSURE] =
         {
-            .type = IIO_PRESSURE, .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
-            // .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),
-            // .info_mask_shared_by_all  = BIT(IIO_CHAN_INFO_SAMP_FREQ),
+            .type               = IIO_PRESSURE,
+            .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
         },
 };
 
-static int bmp280_kd_write_raw(
-    struct iio_dev *indio_dev, struct iio_chan_spec const *chan, int val, int val2, long mask) {
-  return -EINVAL;
-}
-
 static int bmp280_kd_read_raw(
     struct iio_dev *indio_dev, struct iio_chan_spec const *chan, int *val, int *val2, long mask) {
+  printk(KERN_DEBUG "bmp280_kd reading raw");
+
   struct bmp280_kd_data *data = iio_priv(indio_dev);
   s32                    ret  = 0;
 
@@ -763,9 +757,8 @@ static int bmp280_kd_read_raw(
         case IIO_CHAN_INFO_PROCESSED: {
           struct bmp280_uncomp_data uncomp_data = {};
           ret                                   = bmp280_get_uncomp_data(&uncomp_data, data);
-          if (ret < 0) { return ret; }
-          *val = bmp280_comp_temp_32bit(uncomp_data.uncomp_temp, data);
-          ret  = IIO_VAL_INT;
+          if (ret < 0) { goto out; }
+          ret = bmp280_comp_temp_32bit(uncomp_data.uncomp_temp, data, val) ? -ENXIO : IIO_VAL_INT;
           goto out;
 
         } break;
@@ -783,9 +776,8 @@ static int bmp280_kd_read_raw(
         case IIO_CHAN_INFO_PROCESSED: {
           struct bmp280_uncomp_data uncomp_data = {};
           ret                                   = bmp280_get_uncomp_data(&uncomp_data, data);
-          if (ret < 0) { return ret; }
-          *val = bmp280_comp_pres_32bit(uncomp_data.uncomp_press, data);
-          ret  = IIO_VAL_INT;
+          if (ret < 0) { goto out; }
+          ret = bmp280_comp_pres_32bit(uncomp_data.uncomp_press, data, val) ? -ENXIO : IIO_VAL_INT;
           goto out;
           break;
         }
@@ -800,11 +792,7 @@ out:
   return ret;
 }
 
-// // static IIO_CONST_ATTR(in_temp_scale, "10");
-// // static IIO_CONST_ATTR(in_pressure_scale, );
-
 static struct attribute *bmp280_kd_attributes[] = {
-    // &iio_dev_attr_in_temperature_scale.dev_attr.attr,
     NULL,
 };
 
@@ -813,21 +801,16 @@ static const struct attribute_group bmp280_kd_attribute_group = {
 };
 
 static const struct iio_info bmp280_kd_iio_info = {
-    .attrs     = &bmp280_kd_attribute_group,
-    .read_raw  = bmp280_kd_read_raw,
-    .write_raw = bmp280_kd_write_raw,
+    .attrs    = &bmp280_kd_attribute_group,
+    .read_raw = bmp280_kd_read_raw,
 };
-
-static int bmp280_kd_suspend(struct device *dev) { return 0; }
-
-static int bmp280_kd_resume(struct device *dev) { return 0; }
 
 static int bmp280_kd_probe(struct i2c_client *client, const struct i2c_device_id *id) {
   struct bmp280_kd_data *chip;
   struct iio_dev *       indio_dev;
   s32                    ret;
 
-  printk(KERN_DEBUG "Probe started");
+  printk(KERN_INFO "bmp280_kd probe started");
 
   chip = NULL;
   ret  = 0;
@@ -868,16 +851,16 @@ static int bmp280_kd_probe(struct i2c_client *client, const struct i2c_device_id
 
   ret = devm_iio_device_register(indio_dev->dev.parent, indio_dev);
   if (ret) {
-    printk(KERN_DEBUG "Failed at registering iio device");
+    printk(KERN_ALERT "Failed at registering iio device");
     return ret;
   }
 
-  printk(KERN_DEBUG "Done Probing bmp280");
+  printk(KERN_INFO "Done Probing bmp280");
   return 0;
 }
 
 static int bmp280_kd_remove(struct i2c_client *client) {
-  printk(KERN_DEBUG "Removing bmp280 Driver");
+  printk(KERN_INFO "Removing bmp280 Driver");
   return 0;
 }
 
@@ -892,14 +875,10 @@ MODULE_DEVICE_TABLE(of, bmp280_kd_of_match);
 static const struct i2c_device_id bmp280_kd_id[] = {{DRIVER_NAME, 0}, {}};
 MODULE_DEVICE_TABLE(i2c, bmp280_kd_id);
 
-static const struct dev_pm_ops bmp280_kd_pm_ops = {.suspend = bmp280_kd_suspend,
-                                                   .resume  = bmp280_kd_resume};
-
 static struct i2c_driver bmp280_kd_driver = {.probe    = bmp280_kd_probe,
                                              .remove   = bmp280_kd_remove,
                                              .id_table = bmp280_kd_id,
                                              .driver   = {
-                                                 .pm             = &bmp280_kd_pm_ops,
                                                  .owner          = THIS_MODULE,
                                                  .name           = DRIVER_NAME,
                                                  .of_match_table = of_match_ptr(bmp280_kd_of_match),
@@ -910,11 +889,10 @@ static const struct i2c_board_info bmp280_kd_info __initdata = {
 };
 
 static int __init bmp280_kd_init(void) {
-  printk(KERN_DEBUG "Initializing bmp280 Driver");
+  printk(KERN_INFO "Initting bmp280 Driver");
 
 #ifdef DEBUG
-  printk(KERN_DEBUG "Starting bmp280 init debug of regular");
-
+  printk(KERN_DEBUG "Trying to create new I2C devices");
   struct i2c_adapter *adapter = NULL;
   // create new devices, will log an error if already exists one but otw will work
   adapter = i2c_get_adapter(1);

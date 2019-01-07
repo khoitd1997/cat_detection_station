@@ -82,43 +82,40 @@ static unsigned long htu21d_get_meas_delayms(enum htu21d_resolution res, u8 type
 }
 
 static enum htu21d_resolution htu21d_read_resolution(struct i2c_client *client) {
-  int ret;
-
-  ret = i2c_smbus_read_byte_data(client, HTU21D_READ_USER_REG);
+  int ret = i2c_smbus_read_byte_data(client, HTU21D_READ_USER_REG);
   if (ret < 0) {
-    printk(KERN_DEBUG "Error while reading resolution with errors: %d", ret);
+    printk(KERN_DEBUG "htu21d: Error while reading resolution with errors: %d", ret);
     return ret;
   }
   return (enum htu21d_resolution)(ret & HTU21D_USER_REGISTER_RESOLUTION_MASK);
 }
 
 static int htu21d_write_resolution(struct i2c_client *client, enum htu21d_resolution config) {
-  int ret;
-  ret = i2c_smbus_read_byte_data(client, HTU21D_READ_USER_REG);
+  int ret = i2c_smbus_read_byte_data(client, HTU21D_READ_USER_REG);
   if (ret < 0) {
-    printk(KERN_DEBUG "while reading resolution inside write resolution with errors: %d", ret);
+    printk(KERN_DEBUG "htu21d: while reading resolution inside write resolution with errors: %d",
+           ret);
     return ret;
   }
 
   ret = i2c_smbus_write_byte_data(client,
                                   HTU21D_WRITE_USER_REG,
                                   config | ((ret & 0xff) & ~HTU21D_USER_REGISTER_RESOLUTION_MASK));
-  if (ret < 0) { printk(KERN_DEBUG "HTU21d: Error while writing resolution with errors: %d", ret); }
+  if (ret < 0) { printk(KERN_DEBUG "htu21d Error while writing resolution with errors: %d", ret); }
   return ret;
 }
 
 static int htu21d_soft_reset(struct i2c_client *client) {
-  int ret;
-
-  ret = i2c_smbus_write_byte(client, HTU21D_SOFT_RESET);
-  if (ret < 0) { printk(KERN_DEBUG "HTU21d: Error while doing soft reset with errors: %d", ret); }
+  int ret = i2c_smbus_write_byte(client, HTU21D_SOFT_RESET);
+  if (ret < 0) { printk(KERN_ALERT "htu21d Error while doing soft reset with errors: %d", ret); }
   return ret;
 }
 
 static int htu21d_read_data_no_hold(struct i2c_client *    client,
                                     u8                     type,
-                                    enum htu21d_resolution res) {
-  int           ret;
+                                    enum htu21d_resolution res,
+                                    int *                  output) {
+  int           ret = 0;
   u8            readBuf[2];
   unsigned long delayms;
 
@@ -132,35 +129,40 @@ static int htu21d_read_data_no_hold(struct i2c_client *    client,
   };
 
   ret = i2c_smbus_write_byte(client, type);
-  if (ret < 0) { printk(KERN_DEBUG "HTU21d: Error while writing data no hold, errors: %d", ret); }
+  if (ret < 0) {
+    printk(KERN_ALERT "htu21d Error while writing data no hold, errors: %d", ret);
+    return ret;
+  }
+
   delayms = htu21d_get_meas_delayms(res, type);
   msleep(delayms);
-  printk(KERN_DEBUG "Selected delays: %lu", delayms);
   ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
   if (ret < 0) {
+    printk(KERN_WARNING "htu21d: Giving sensors additional sleep time");
     msleep(2);  // give it some more time
-    printk(KERN_DEBUG "Giving sensors additional sleep time");
     ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
   }
-  if (ret == ARRAY_SIZE(msgs)) { return ((readBuf[0] << 8) + (readBuf[1] & 0xff)) & 0xffff; }
+
+  if (ret == ARRAY_SIZE(msgs)) {
+    *output = ((readBuf[0] << 8) + (readBuf[1] & 0xff)) & 0xffff;
+    ret     = 0;
+  }
   return ret;
 }
 
-static int htu21d_get_data_from_raw(int data) { return data; }
-
-static int htu21d_read_temp(struct htu21d_kd_data *data) {
-  return htu21d_read_data_no_hold(data->client, HTU21D_TRIGGER_TEMP_MEASURE_NOHOLD, data->res);
+static int htu21d_read_temp(struct htu21d_kd_data *data, int *output) {
+  return htu21d_read_data_no_hold(
+      data->client, HTU21D_TRIGGER_TEMP_MEASURE_NOHOLD, data->res, output);
 }
 
-static int htu21d_read_humidity(struct htu21d_kd_data *data) {
-  return htu21d_read_data_no_hold(data->client, HTU21D_TRIGGER_HUMD_MEASURE_NOHOLD, data->res);
+static int htu21d_read_humidity(struct htu21d_kd_data *data, int *output) {
+  return htu21d_read_data_no_hold(
+      data->client, HTU21D_TRIGGER_HUMD_MEASURE_NOHOLD, data->res, output);
 }
 
 static int htu21d_init(struct htu21d_kd_data *data) {
-  int ret;
-
-  ret = htu21d_write_resolution(data->client, data->res);
-  if (ret < 0) { printk(KERN_DEBUG "HTU21d: Error while initting: %d", ret); }
+  int ret = htu21d_write_resolution(data->client, data->res);
+  if (ret < 0) { printk(KERN_ALERT "htu21d: Error while initting device: %d", ret); }
   return ret;
 }
 
@@ -174,14 +176,8 @@ static const struct iio_chan_spec htu21d_kd_channels[] = {
         {
             .type               = IIO_HUMIDITYRELATIVE,
             .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-
         },
 };
-
-static int htu21d_kd_write_raw(
-    struct iio_dev *indio_dev, struct iio_chan_spec const *chan, int val, int val2, long mask) {
-  return -EINVAL;
-}
 
 static int htu21d_kd_read_raw(
     struct iio_dev *indio_dev, struct iio_chan_spec const *chan, int *val, int *val2, long mask) {
@@ -193,10 +189,9 @@ static int htu21d_kd_read_raw(
     case IIO_TEMP:
       switch (mask) {
         case IIO_CHAN_INFO_RAW:
-          ret = htu21d_read_temp(data);
+          ret = htu21d_read_temp(data, val);
           if (ret < 0) { goto out; }
-          *val = ret;
-          ret  = IIO_VAL_INT;
+          ret = IIO_VAL_INT;
           goto out;
           break;
       }
@@ -205,10 +200,9 @@ static int htu21d_kd_read_raw(
     case IIO_HUMIDITYRELATIVE:
       switch (mask) {
         case IIO_CHAN_INFO_RAW:
-          ret = htu21d_read_humidity(data);
+          ret = htu21d_read_humidity(data, val);
           if (ret < 0) { goto out; }
-          *val = ret;
-          ret  = IIO_VAL_INT;
+          ret = IIO_VAL_INT;
           goto out;
           break;
       }
@@ -223,6 +217,7 @@ out:
   return ret;
 }
 
+// these numbers come from the datasheet formulas
 static IIO_CONST_ATTR(in_temp_scale, "2.681227");
 static IIO_CONST_ATTR(in_temp_offset, "-17473.03437");
 static IIO_CONST_ATTR(in_humidityrelative_scale, "0.001907348633");
@@ -241,20 +236,18 @@ static const struct attribute_group htu21d_kd_attribute_group = {
 };
 
 static const struct iio_info htu21d_kd_iio_info = {
-    .attrs     = &htu21d_kd_attribute_group,
-    .read_raw  = htu21d_kd_read_raw,
-    .write_raw = htu21d_kd_write_raw,
+    .attrs    = &htu21d_kd_attribute_group,
+    .read_raw = htu21d_kd_read_raw,
 };
 
 static int htu21d_kd_probe(struct i2c_client *client, const struct i2c_device_id *id) {
-  struct htu21d_kd_data *chip;
-  struct iio_dev *       indio_dev;
-  int                    ret;
+  struct htu21d_kd_data *chip      = NULL;
+  struct iio_dev *       indio_dev = NULL;
+  int                    ret       = 0;
 
-  printk(KERN_DEBUG "Probe started");
+  printk(KERN_INFO "htu21d: Probe started");
 
-  chip = NULL;
-
+  // managed device that will deleted automatically on remove
   indio_dev = devm_iio_device_alloc(&client->dev, sizeof(struct htu21d_kd_data));
   if (!indio_dev) { return -ENOMEM; }
 
@@ -264,7 +257,10 @@ static int htu21d_kd_probe(struct i2c_client *client, const struct i2c_device_id
   chip->res    = DEFAULT_RESOLUTION;
 
   ret = htu21d_init(chip);  // get device ready and write default settings in
-  if (ret < 0) { return ret; }
+  if (ret < 0) {
+    printk(KERN_ALERT "htu21d: Failed to init device");
+    return ret;
+  }
 
   /* this is only used for device removal purposes */
   i2c_set_clientdata(client, indio_dev);
@@ -279,32 +275,16 @@ static int htu21d_kd_probe(struct i2c_client *client, const struct i2c_device_id
 
   ret = devm_iio_device_register(indio_dev->dev.parent, indio_dev);
   if (ret) {
-    printk(KERN_DEBUG "Failed at registering iio device");
+    printk(KERN_ALERT "htu21d: Failed at registering iio device");
     return ret;
   }
 
-  ret = htu21d_read_temp(chip);
-  if (ret < 0) {
-    printk(KERN_DEBUG "Failed at registering reading temperature");
-    return ret;
-  } else {
-    printk(KERN_DEBUG "Temperature Raw: %d", ret);
-  }
-
-  ret = htu21d_read_humidity(chip);
-  if (ret < 0) {
-    printk(KERN_DEBUG "Failed at registering reading humidity");
-    return ret;
-  } else {
-    printk(KERN_DEBUG "humidity Raw: %d", ret);
-  }
-
-  printk(KERN_DEBUG "Done Probing htu21d");
+  printk(KERN_INFO "htu21d: Done Probing");
   return 0;
 }
 
 static int htu21d_kd_remove(struct i2c_client *client) {
-  printk(KERN_DEBUG "Removing htu21d Driver");
+  printk(KERN_INFO "Removing htu21d Driver");
   return 0;
 }
 
@@ -333,15 +313,16 @@ static const struct i2c_board_info htu21d_kd_info __initdata = {
 };
 
 static int __init htu21d_kd_init(void) {
-#ifdef DEBUG
   printk(KERN_DEBUG "Initializing htu21d Driver");
 
-  struct i2c_adapter *adapter = NULL;
-  // create new devices, will log an error if already exists one but otw will work
-  adapter = i2c_get_adapter(1);
-  if (NULL == adapter) { printk(KERN_DEBUG "Can't find adapter"); }
+  // #ifdef DEBUG
+  struct i2c_adapter *adapter = i2c_get_adapter(1);
+  if (NULL == adapter) {
+    printk(KERN_DEBUG "Can't find adapter");
+    return -ENODEV;
+  }
   i2c_new_device(adapter, &htu21d_kd_info);
-#endif
+  // #endif
 
   return i2c_add_driver(&htu21d_kd_driver);
 }
