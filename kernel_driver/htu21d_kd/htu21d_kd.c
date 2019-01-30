@@ -144,7 +144,7 @@ static int htu21d_read_data_no_hold(struct i2c_client *    client,
   }
 
   if (ret == ARRAY_SIZE(msgs)) {
-    *output = ((readBuf[0] << 8) + (readBuf[1] & 0xff)) & 0xffff;
+    *output = ((readBuf[0] << 8) + (readBuf[1] & 0xfc)) & 0xffff;
     ret     = 0;
   }
   return ret;
