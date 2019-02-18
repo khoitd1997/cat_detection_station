@@ -36,6 +36,6 @@ This project uses an rpi3 as the main board running a custom linux distro create
 
 - Newest stable kernel(with real-time patch included if possible)
 - Python 3(may be removed later if opencv c++ is used instead)
-- Custom driver for the OV7670, and the temperature sensor, so it needs i2c support
+- Custom driver for pi camera, the humidity, pressure, and temperature sensor, so it needs i2c support
 - Either Bluetooth or wifi support for sending data
 - OTA update if possible(using stuffs like swupdate)
