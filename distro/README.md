@@ -10,9 +10,26 @@ https://www.instructables.com/id/How-to-Transfer-Files-From-a-Raspberry-Pi-to-a-
 
 https://tewarid.github.io/2014/10/29/bluetooth-on-raspberry-pi-with-buildroot.html (bluetooth with buildroot)
 
+## Special Notes
+
+**ALWAYS EJECT SD CARD AND POWEROFF PI PROPERLY**, failing to do so may result in things like the partition being read-only and the file was not completely saved
+
+For ash shell, to poweroff:
+
+```shell
+poweroff -f
+```
+
+## Configurations
+
+- Root passwords
+- Enable gpu memory to be at least 128Mb(do this by setting the additional argument to the post-image script to be gpu_mem_1024=150)
+
 ## Packages
 
 Defconfig saved as **cat_alert_defconfig**
+
+Base config is raspberrypi3_defconfig since the libraries used for camera doesn't seem to support 64 bits that well
 
 - Init System:
   - Busybox: as long as there is no need for fancier things, this should be fine
@@ -26,14 +43,17 @@ Defconfig saved as **cat_alert_defconfig**
   - U-boot: rpi3 is officially supported so shouldn't be too much work
 - Kernel Module and DTS:
   - i2c, iio subsystem in kernel settings(as built-in not modules)
-  - eudev for device loading
-  - Pi camera: use v4l firmware
+  - iio python bindings
+  - mdev for device loading(remember to enable it)
+  - Pi camera:
+    -  select the extra option for rpi firmware, (no need for start_x = 1 in config.txt)
+    -  enable the relevant options in Multimedia application inside kernel driver of kernel settings
   - dts support for kernel modules autoload
 - Other stuffs:
   - libiio
   - glog for logging
 - Debug Tools:
-  - vcdbg: for debugging of dts
+  - vcdbg: for debugging of dts and other rpi specific things
   - bash: just for initial debugging
   - nano
   - coreutils
@@ -81,10 +101,6 @@ done
 # ...
 # genimage something
 ```
-
-## Configurations
-
-- Root passwords
 
 ## Adding Kernel Modules
 
